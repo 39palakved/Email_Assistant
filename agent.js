@@ -8,14 +8,14 @@ import { connectVectorStore } from "./prepare.js";
 import { MemorySaver, Command } from "@langchain/langgraph";
 
 
-// --- Initialization ---
+
 const vectorStore = await connectVectorStore();
 
-// Initializing the MemorySaver Checkpointer
+
 const memorySaver = new MemorySaver();
 
 
-// 1. Rag Search tool
+
 const ragSearch = tool(
   async ({ query }) => {
     console.log("RAG tool calling...");
@@ -33,7 +33,7 @@ const ragSearch = tool(
 );
 
 
-// 2. SEND Email Tool (Triggers the human interrupt)
+
 const sendEmailTool = tool(
   async ({ recipient, subject, body }) => {
     console.log(`\n✅ Email Approved and SENT to: ${recipient}`);
@@ -54,7 +54,7 @@ const sendEmailTool = tool(
 );
 
 
-// --- LLM & Agent Configuration ---
+
 const llm = new ChatGroq({
   model: "openai/gpt-oss-120b",
   temperature: 0,
@@ -73,14 +73,14 @@ const agent = createAgent({
     humanInTheLoopMiddleware({
       interruptOn: { sendEmailTool: true },
       descriptionPrefix: "Send Email Approval",
-      // Checkpointer remains missing from middleware as requested
+      
     }),
   ],
-  checkpointer: new MemorySaver(), // Checkpointer remains at root as requested
+  checkpointer: new MemorySaver(), 
 });
 
 
-// FIX: Removed unnecessary global 'pendingArgs = null;'
+
 
 
 async function main() {
