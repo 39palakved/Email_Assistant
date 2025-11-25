@@ -10,8 +10,22 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@langchain/core": "^1.0.6",
+    "@huggingface/inference": "^4.13.3",
+    "@langchain/community": "^1.0.5",
+    "@langchain/core": "^1.1.0",
     "@langchain/groq": "^1.0.1",
+    "@langchain/langgraph": "^1.0.2",
+    "@langchain/pinecone": "^1.0.1",
+    "@pinecone-database/pinecone": "^5.1.2",
+    "dotenv": "^17.2.3",
     "langchain": "^1.0.6"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/39palakved/Email_Assistant.git"
+  },
+  "bugs": {
+    "url": "https://github.com/39palakved/Email_Assistant/issues"
+  },
+  "homepage": "https://github.com/39palakved/Email_Assistant#readme"
 }
