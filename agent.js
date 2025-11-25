@@ -27,27 +27,33 @@ const ragSearch = tool(
 );
 
 const generateDraftTool = tool(
-  async ({ recipient, details }) => {
+  async ({ recipient, subject, details }) => {
     const llm = new ChatGroq({ model: "openai/gpt-oss-120b", temperature: 0 });
     const response = await llm.invoke({
       messages: [
         {
           role: "user",
-          content: `Draft an email to ${recipient} using details: ${details}`,
+          content: `Draft an email to ${recipient} with subject "${subject}" using details: ${details}`,
         },
       ],
     });
-    return response.content;
+
+    return {
+      subject,
+      body: response.content,
+    };
   },
   {
     name: "generateDraftTool",
     description: "Generates an email draft using LLM",
     schema: z.object({
       recipient: z.string(),
+      subject: z.string(),
       details: z.string(),
     }),
   }
 );
+
 
 const draftEmailTool = tool(
   async ({ subject, body }) => {
