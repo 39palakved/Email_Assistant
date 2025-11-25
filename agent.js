@@ -84,7 +84,7 @@ const agent = createAgent({
 
 
 async function main() {
-    console.log("Email Agent Ready. Ask me to 'draft an email...'");
+   
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
