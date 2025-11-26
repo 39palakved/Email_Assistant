@@ -71,7 +71,7 @@ const agent = createAgent({
   middleware: [
     humanInTheLoopMiddleware({
       interruptOn: { sendEmailTool: true  },
-    skipOnResume: true,
+       skipOnResume: true,
       descriptionPrefix: "Send Email Approval",
       
     }),
@@ -111,46 +111,46 @@ const rl = readline.createInterface({
                 });
             }
        
-if (query === "2") {
-    const req = interrupts[0].value.actionRequests[0];
+            else if (query === "2") {
+                const req = interrupts[0].value.actionRequests[0];
 
-    console.log("\n--- Edit Email Body ---");
-    console.log("Current body:\n" + req.args.body);
-    console.log("\nType the full corrected email body below.");
-    console.log("Press ENTER on an empty line to finish.\n");
+                console.log("\n--- Edit Email Body ---");
+                console.log("Current body:\n" + req.args.body);
+                console.log("\nType the full corrected email body below.");
+                console.log("Press ENTER on an empty line to finish.\n");
 
-    const editedLines = [];
-    while (true) {
-        const line = await rl.question("");
-        if (!line.trim()) break;
-        editedLines.push(line);
-    }
+                const editedLines = [];
+                while (true) {
+                    const line = await rl.question("");
+                    if (!line.trim()) break;
+                    editedLines.push(line);
+                }
 
-    const updatedBody = editedLines.length ? editedLines.join("\n").trim() : req.args.body;
+                const updatedBody = editedLines.length ? editedLines.join("\n").trim() : req.args.body;
 
 
-    const finalArgs = {
-        recipient: req.args.recipient,
-        subject: req.args.subject,
-        body: updatedBody, 
-    };
+                const finalArgs = {
+                    recipient: req.args.recipient,
+                    subject: req.args.subject,
+                    body: updatedBody, 
+                };
 
-    command = new Command({
-        resume: {
-            [interrupts[0].id]: {
-                decisions: [
-                    {
-                        type: "edit", 
-                        editedAction: {
-                            name: req.name,
-                            args: finalArgs, 
-                        }
+                command = new Command({
+                    resume: {
+                        [interrupts[0].id]: {
+                            decisions: [
+                                {
+                                    type: "edit", 
+                                    editedAction: {
+                                        name: req.name,
+                                        args: finalArgs, 
+                                    }
+                                },
+                            ],
+                        },
                     },
-                ],
-            },
-        },
-    });
-}
+                });
+            }
 
 
             else {
@@ -167,8 +167,8 @@ if (query === "2") {
             response = await agent.invoke(command, {
                 configurable: { thread_id: "1" },
             });
-           
-
+          
+              
             interrupts = [];
             continue;
         }
@@ -212,7 +212,12 @@ if (query === "2") {
             output += "(Enter '1' to approve and send, '2' to edit and any other key to reject)";
         }
 
-        
+        else if (response.returnValues) {
+
+    console.log("\n📨 Final Tool Output:");
+    console.log(response.returnValues);
+}
+
    
         else {
             const lastMessage = response.messages[response.messages.length - 1];
