@@ -212,19 +212,13 @@ async function main() {
       output += "Choose:\n1. approve\n2. edit \n3. reject\n";
       output +=
         "(Enter '1' to approve and send, '2' to edit and any other key to reject)";
-    }  else {
-      const toolMsg = response.messages.find(
-        (m) => m.type === "tool" && m.name === "sendEmailTool"
-      );
+    }  
+      
+      else { 
+        output += response.messages[response.messages.length - 1].content;       
+        }
+    
 
-      if (toolMsg) {
-        console.log("\n📨 Email Tool Result:");
-        console.log(toolMsg.content);
-      } else {
-        const lastMessage = response.messages.at(-1);
-        console.log(lastMessage?.content || "No final content received.");
-      }
-    }
 
     console.log(output);
   }
