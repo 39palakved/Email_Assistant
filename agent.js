@@ -82,163 +82,156 @@ const agent = createAgent({
 
 
 async function main() {
-    
-const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
 
-    let interrupts = [];
-    while (true) {
-        const query = await rl.question("You: ");
+  let interrupts = [];
+  while (true) {
+    const query = await rl.question("You: ");
 
-        if (query === "bye") break;
+    if (query === "bye") break;
 
-        let response;
+    let response;
 
-        
-        if (interrupts.length) {
-            let command;
+    if (interrupts.length) {
+      let command;
 
-            
-            if (query === "1") {
-                command = new Command({
-                    resume: {
-                        [interrupts[0].id]: {
-                            decisions: [{ type: "approve" }],
-                        },
-                    },
-                });
-            }
-       
-            else if (query === "2") {
-                const req = interrupts[0].value.actionRequests[0];
+      if (query === "1") {
+        command = new Command({
+          resume: {
+            [interrupts[0].id]: {
+              decisions: [{ type: "approve" }],
+            },
+          },
+        });
+      } else if (query === "2") {
+        const req = interrupts[0].value.actionRequests[0];
 
-                console.log("\n--- Edit Email Body ---");
-                console.log("Current body:\n" + req.args.body);
-                console.log("\nType the full corrected email body below.");
-                console.log("Press ENTER on an empty line to finish.\n");
+        console.log("\n--- Edit Email Body ---");
+        console.log("Current body:\n" + req.args.body);
+        console.log("\nType the full corrected email body below.");
+        console.log("Press ENTER on an empty line to finish.\n");
 
-                const editedLines = [];
-                while (true) {
-                    const line = await rl.question("");
-                    if (!line.trim()) break;
-                    editedLines.push(line);
-                }
-
-                const updatedBody = editedLines.length ? editedLines.join("\n").trim() : req.args.body;
-
-
-                const finalArgs = {
-                    recipient: req.args.recipient,
-                    subject: req.args.subject,
-                    body: updatedBody, 
-                };
-
-                command = new Command({
-                    resume: {
-                        [interrupts[0].id]: {
-                            decisions: [
-                                {
-                                    type: "edit", 
-                                    editedAction: {
-                                        name: req.name,
-                                        args: finalArgs, 
-                                    }
-                                },
-                            ],
-                        },
-                    },
-                });
-            }
-
-
-            else {
-                command = new Command({
-                    resume: {
-                        [interrupts[0].id]: {
-                            decisions: [{ type: "reject" }],
-                        },
-                    },
-                });
-            }
-
-
-            response = await agent.invoke(command, {
-                configurable: { thread_id: "1" },
-            });
-          
-              
-            interrupts = [];
-            continue;
+        const editedLines = [];
+        while (true) {
+          const line = await rl.question("");
+          if (!line.trim()) break;
+          editedLines.push(line);
         }
 
+        const updatedBody =
+          editedLines.length ? editedLines.join("\n").trim() : req.args.body;
 
-      
-        else {
-            response = await agent.invoke(
-                { messages: [{ role: "user", content: query }] },
-                { configurable: { thread_id: "1" } }
-            );
+        const finalArgs = {
+          recipient: req.args.recipient,
+          subject: req.args.subject,
+          body: updatedBody,
+        };
+
+        // keep using type: "edit" but tell HITL to run it immediately
+        command = new Command({
+          resume: {
+            [interrupts[0].id]: {
+              decisions: [
+                {
+                  type: "edit",
+                  previousOutcome: "approve",
+                  editedAction: {
+                    name: req.name,
+                    args: finalArgs,
+                  },
+                },
+              ],
+            },
+          },
+        });
+      } else {
+        command = new Command({
+          resume: {
+            [interrupts[0].id]: {
+              decisions: [{ type: "reject" }],
+            },
+          },
+        });
+      }
+
+      // resume the interrupt (this should trigger the agent to run the edited action)
+      response = await agent.invoke(command, {
+        configurable: { thread_id: "1" },
+      });
+
+      // --- IMPORTANT: PRINT TOOL OUTPUT AFTER RESUME ---
+      // Check messages for a tool result (sendEmailTool)
+      const toolMsgAfter = response.messages?.find(
+        (m) => m.type === "tool" && m.name === "sendEmailTool"
+      );
+
+      if (toolMsgAfter) {
+        console.log("\n📨 Email Tool Result:");
+        console.log(toolMsgAfter.content);
+      } else if (response.returnValues) {
+        console.log("\n📨 Final Tool Output:");
+        console.log(response.returnValues);
+      } else {
+        // fallback: show last assistant/tool message if any
+        const lastMessage = response.messages?.at(-1);
+        if (lastMessage?.content) {
+          console.log("\n" + lastMessage.content);
         }
+      }
 
-        interrupts = [];
-        let output = "";
-
-        
-        if (response?.__interrupt__?.length) {
-           
-            const interrupt = response.__interrupt__[0];
-            interrupts.push(interrupt);
-
-            const req = interrupt.value.actionRequests?.[0];
-            
-            
-            const args = req?.args || {}; 
-            
-            
-
-            output += `\n*** ⏸️ HUMAN REVIEW REQUIRED (Enter '1' to Approve) ***\n`;
-            output += `Tool Requested: ${req?.name || 'N/A'}\n`;
-            output += "--- Proposed Email Draft ---\n";
-            
-            
-            output += `Recipient: ${args.recipient || 'N/A'}\n`;
-            output += `Subject: ${args.subject || 'N/A'}\n\n`;
-            output += `Body:\n${(args.body || 'Email body not generated.').trim()}\n`;
-            
-
-            output += "Choose:\n1. approve\n2. edit \n3. reject\n";
-            output += "(Enter '1' to approve and send, '2' to edit and any other key to reject)";
-        }
-
-        else if (response.returnValues) {
-
-    console.log("\n📨 Final Tool Output:");
-    console.log(response.returnValues);
-}
-
-   
-        else {
-            const lastMessage = response.messages[response.messages.length - 1];
-
-        
-          
-            if (lastMessage?.type === "tool") {
-                
-                output += lastMessage.content;
-            } 
-           
-            else { 
-                output += lastMessage?.content || "No final content received.";
-            }
-        }
-
-        console.log(output);
+      // clear interrupts and continue to next user input
+      interrupts = [];
+      continue;
+    } else {
+      response = await agent.invoke(
+        { messages: [{ role: "user", content: query }] },
+        { configurable: { thread_id: "1" } }
+      );
     }
 
-    rl.close();
+    // normal incoming response handling (initial tool interrupt or final outputs)
+    interrupts = [];
+    let output = "";
+
+    if (response?.__interrupt__?.length) {
+      const interrupt = response.__interrupt__[0];
+      interrupts.push(interrupt);
+
+      const req = interrupt.value.actionRequests?.[0];
+      const args = req?.args || {};
+
+      output += `\n*** ⏸️ HUMAN REVIEW REQUIRED (Enter '1' to Approve) ***\n`;
+      output += `Tool Requested: ${req?.name || "N/A"}\n`;
+      output += "--- Proposed Email Draft ---\n";
+      output += `Recipient: ${args.recipient || "N/A"}\n`;
+      output += `Subject: ${args.subject || "N/A"}\n\n`;
+      output += `Body:\n${(args.body || "Email body not generated.").trim()}\n`;
+      output += "Choose:\n1. approve\n2. edit \n3. reject\n";
+      output +=
+        "(Enter '1' to approve and send, '2' to edit and any other key to reject)";
+    }  else {
+      const toolMsg = response.messages.find(
+        (m) => m.type === "tool" && m.name === "sendEmailTool"
+      );
+
+      if (toolMsg) {
+        console.log("\n📨 Email Tool Result:");
+        console.log(toolMsg.content);
+      } else {
+        const lastMessage = response.messages.at(-1);
+        console.log(lastMessage?.content || "No final content received.");
+      }
+    }
+
+    console.log(output);
+  }
+
+  rl.close();
 }
+
 
 main()
 
