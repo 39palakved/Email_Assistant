@@ -35,13 +35,12 @@ const ragSearch = tool(
 
 
 const sendEmailTool = tool(
-  async ({ recipient, subject, body }) => {
-    console.log(`\n✅ Email Approved and SENT to: ${recipient}`);
-    console.log("Subject:", subject);
-    console.log("Body:\n", body);
-  
+async ({ recipient, subject, body }) => {
+    
+   console.log(`updated send body: ${body}`)
     return `Email successfully sent to ${recipient}!`;
   },
+  
   {
     name: "sendEmailTool",
     description: "Sends the final approved email to a recipient.",
@@ -71,7 +70,8 @@ const agent = createAgent({
   tools: [ragSearch, sendEmailTool],
   middleware: [
     humanInTheLoopMiddleware({
-      interruptOn: { sendEmailTool: true },
+      interruptOn: { sendEmailTool: true  },
+    skipOnResume: true,
       descriptionPrefix: "Send Email Approval",
       
     }),
@@ -81,88 +81,159 @@ const agent = createAgent({
 
 
 
-
-
 async function main() {
-   
-    const rl = readline.createInterface({
+    
+const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
     });
 
     let interrupts = [];
+    while (true) {
+        const query = await rl.question("You: ");
 
-    while (true) {
-        const query = await rl.question("You: ");
+        if (query === "bye") break;
 
-        if (query === "/bye") break;
+        let response;
 
-        let response;
+        
+        if (interrupts.length) {
+            let command;
 
-    
-        if (interrupts.length) {
-            const decision = query === "1" ? "approve" : "reject";
+            
+            if (query === "1") {
+                command = new Command({
+                    resume: {
+                        [interrupts[0].id]: {
+                            decisions: [{ type: "approve" }],
+                        },
+                    },
+                });
+            }
+       
+if (query === "2") {
+    const req = interrupts[0].value.actionRequests[0];
 
-            const command = new Command({
-                resume: {
-                    [interrupts[0].id]: {
-                        decisions: [{ type: decision }],
-                    },
-                },
-            });
+    console.log("\n--- Edit Email Body ---");
+    console.log("Current body:\n" + req.args.body);
+    console.log("\nType the full corrected email body below.");
+    console.log("Press ENTER on an empty line to finish.\n");
 
-            response = await agent.invoke(command, {
-                configurable: { thread_id: "1" },
-            });
-        }
+    const editedLines = [];
+    while (true) {
+        const line = await rl.question("");
+        if (!line.trim()) break;
+        editedLines.push(line);
+    }
 
-       
-        else {
-            response = await agent.invoke(
-                { messages: [{ role: "user", content: query }] },
-                { configurable: { thread_id: "1" } }
-            );
-        }
+    const updatedBody = editedLines.length ? editedLines.join("\n").trim() : req.args.body;
 
-        interrupts = [];
-        let output = "";
 
-       
-        if (response?.__interrupt__?.length) {
-    console.log(response.__interrupt__)
-            const interrupt = response.__interrupt__[0];
-            interrupts.push(interrupt);
+    const finalArgs = {
+        recipient: req.args.recipient,
+        subject: req.args.subject,
+        body: updatedBody, 
+    };
 
-            const req = interrupt.value.actionRequests?.[0];
-            console.log(req)
-           
-            const args = req?.args ||  {}; 
-            
-           
-
-            output += `\n*** ⏸️ HUMAN REVIEW REQUIRED (Enter '1' to Approve) ***\n`;
-            output += `Tool Requested: ${req?.name || 'N/A'}\n`;
-            output += "--- Proposed Email Draft ---\n";
-            
-            
-            output += `Recipient: ${args.recipient || 'N/A'}\n`;
-            output += `Subject: ${args.subject || 'N/A'}\n\n`;
-            output += `Body:\n${(args.body || 'Email body not generated.').trim()}\n`;
-         
-
-            output += "Choose:\n1. approve\n2. reject\n";
-            output += "(Enter '1' to approve and send, any other key to reject)";
-        }
-
-       
-        else {
-            output += response.messages[response.messages.length - 1].content;
-        }
-
-        console.log(output);
-    }
-
-    rl.close();
+    command = new Command({
+        resume: {
+            [interrupts[0].id]: {
+                decisions: [
+                    {
+                        type: "edit", 
+                        editedAction: {
+                            name: req.name,
+                            args: finalArgs, 
+                        }
+                    },
+                ],
+            },
+        },
+    });
 }
 
-main();
+
+            else {
+                command = new Command({
+                    resume: {
+                        [interrupts[0].id]: {
+                            decisions: [{ type: "reject" }],
+                        },
+                    },
+                });
+            }
+
+
+            response = await agent.invoke(command, {
+                configurable: { thread_id: "1" },
+            });
+           
+
+            interrupts = [];
+            continue;
+        }
+
+
+      
+        else {
+            response = await agent.invoke(
+                { messages: [{ role: "user", content: query }] },
+                { configurable: { thread_id: "1" } }
+            );
+        }
+
+        interrupts = [];
+        let output = "";
+
+        
+        if (response?.__interrupt__?.length) {
+           
+            const interrupt = response.__interrupt__[0];
+            interrupts.push(interrupt);
+
+            const req = interrupt.value.actionRequests?.[0];
+            
+            
+            const args = req?.args || {}; 
+            
+            
+
+            output += `\n*** ⏸️ HUMAN REVIEW REQUIRED (Enter '1' to Approve) ***\n`;
+            output += `Tool Requested: ${req?.name || 'N/A'}\n`;
+            output += "--- Proposed Email Draft ---\n";
+            
+            
+            output += `Recipient: ${args.recipient || 'N/A'}\n`;
+            output += `Subject: ${args.subject || 'N/A'}\n\n`;
+            output += `Body:\n${(args.body || 'Email body not generated.').trim()}\n`;
+            
+
+            output += "Choose:\n1. approve\n2. edit \n3. reject\n";
+            output += "(Enter '1' to approve and send, '2' to edit and any other key to reject)";
+        }
+
+        
+   
+        else {
+            const lastMessage = response.messages[response.messages.length - 1];
+
+        
+          
+            if (lastMessage?.type === "tool") {
+                
+                output += lastMessage.content;
+            } 
+           
+            else { 
+                output += lastMessage?.content || "No final content received.";
+            }
+        }
+
+        console.log(output);
+    }
+
+    rl.close();
+}
+
+main()
+
